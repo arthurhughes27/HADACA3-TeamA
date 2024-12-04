@@ -1,3 +1,5 @@
+library(dplyr)
+
 data = readRDS("~/Bureau/Work/PhD/conferences/HADACA3/starting_kit_phase1/data/mixes1_SDE5_pdac.rds")
 reference = readRDS("~/Bureau/Work/PhD/conferences/HADACA3/starting_kit_phase1/data/reference_pdac.rds")
 
