@@ -38,6 +38,7 @@ genelist_top500FC = top_genes_FC$Gene
 
 # Identify CpG Sites with highest variation
 
+met_variances <- apply(ref_met %>% scale(), 1, var)
 filter_cpg <- data.frame("site" = rownames(ref_met), 
                          "variance" = met_variances,
                          "varrank" = rank(-met_variances)) %>% 
