@@ -42,9 +42,7 @@ program = function(mix_rna=NULL,
   #                             rowMeans(ref_basal))
   # colnames(ref_sc_constrained) = c("immune", "endo", "fibro", "classic", "basal")
 
-  # Prefiltering on ref_bulkRNA
-  # Identify genes with highest FC between first and second most expressed cell types. 
-  # Calculate the fold change between the top two cell types for each gene
+  # Function for filtering
   calculate_fold_change <- function(x) {
     sorted_values <- sort(x, decreasing = TRUE) # Sort expression values for the gene
     if (length(sorted_values) > 1) {
@@ -54,6 +52,9 @@ program = function(mix_rna=NULL,
     }
   }
 
+  # Prefiltering on ref_bulkRNA
+  # Identify genes with highest FC between first and second most expressed cell types. 
+  # Calculate the fold change between the top two cell types for each gene
   # Apply the function to each row of the matrix
   fold_changes <- apply(ref_bulkRNA, 1, calculate_fold_change)
 
@@ -69,10 +70,33 @@ program = function(mix_rna=NULL,
   top_genes <- top_genes[order(-top_genes$FoldChange), ]
 
   # Select the top 500 genes
-  top_genes_FC <- head(top_genes, 500)
+  top_genes_FC <- head(top_genes, 300)
 
-  genelist_top500FC = top_genes_FC$Gene
-  new_ref_bulkRNA <- ref_bulkRNA[genelist_top500FC,]
+  genelist_top300FC = top_genes_FC$Gene
+  new_ref_bulkRNA <- ref_bulkRNA[genelist_top300FC,]
+
+  # Prefiltering on met
+
+  # Apply the function to each row of the matrix
+  met_fold_changes <- apply(ref_met, 1, calculate_fold_change)
+
+  # Create a dataframe of sites and their fold changes
+  met_fold_change_df <- data.frame(
+      Site = rownames(ref_met),
+      FoldChange = met_fold_changes,
+      met_log2FC = log2(met_fold_changes+1),
+      rank_FC = rank(-met_fold_changes)
+  )
+
+  # Filter for non-NA fold changes and sort by fold change in descending order
+  top_sites <- met_fold_change_df[!is.na(met_fold_change_df$FoldChange), ]
+  top_sites <- top_sites[order(-top_sites$FoldChange), ]
+
+  # Select the top 500 sites
+  top_sites_FC <- head(top_sites, 1000)
+
+  sitelist_top1000FC = top_sites_FC$Site
+  new_ref_met <- ref_met[sitelist_top1000FC,]
   
   # # Instlaling EpiDISH for the RCP function
   # BiocManager::install("EpiDISH")
@@ -124,18 +148,18 @@ program = function(mix_rna=NULL,
     # colnames(prop_met) = colnames(ref_met)
     # print(colnames(ref_met))
     
-    idx_feat = intersect(rownames(mix_met), rownames(ref_met))
+    idx_feat = intersect(rownames(mix_met), rownames(new_ref_met))
     mix_met = mix_met[idx_feat,]
  
     # Linear methods
-    ref_met = ref_met[idx_feat,]
+    new_ref_met = new_ref_met[idx_feat,]
     
     prop_met = apply(mix_met, 2, function(b, A) {
       tmp_prop = nnls::nnls(b=b, A=A)$x
       tmp_prop = tmp_prop / sum(tmp_prop) # Sum To One
       return(tmp_prop)
-    }, A=ref_met)  
-    rownames(prop_met) = colnames(ref_met)
+    }, A=new_ref_met)  
+    rownames(prop_met) = colnames(new_ref_met)
 
     return(prop_met)
 
