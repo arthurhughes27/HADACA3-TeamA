@@ -41,27 +41,60 @@ program = function(mix_rna=NULL,
   #                             rowMeans(ref_classic), 
   #                             rowMeans(ref_basal))
   # colnames(ref_sc_constrained) = c("immune", "endo", "fibro", "classic", "basal")
+
+  # Prefiltering on ref_bulkRNA
+  # Identify genes with highest FC between first and second most expressed cell types. 
+  # Calculate the fold change between the top two cell types for each gene
+  calculate_fold_change <- function(x) {
+    sorted_values <- sort(x, decreasing = TRUE) # Sort expression values for the gene
+    if (length(sorted_values) > 1) {
+      return(sorted_values[1] / sorted_values[2]) # Fold change: top value / second top value
+    } else {
+      return(NA) # Handle cases where there are less than 2 cell types
+    }
+  }
+
+  # Apply the function to each row of the matrix
+  fold_changes <- apply(ref_bulkRNA, 1, calculate_fold_change)
+
+  # Create a dataframe of genes and their fold changes
+  fold_change_df <- data.frame(
+    Gene = rownames(ref_bulkRNA),
+    FoldChange = fold_changes,
+      log2FC = log2(fold_changes+1)
+  )
+
+  # Filter for non-NA fold changes and sort by fold change in descending order
+  top_genes <- fold_change_df[!is.na(fold_change_df$FoldChange), ]
+  top_genes <- top_genes[order(-top_genes$FoldChange), ]
+
+  # Select the top 500 genes
+  top_genes_FC <- head(top_genes, 500)
+
+  genelist_top500FC = top_genes_FC$Gene
+  new_ref_bulkRNA <- ref_bulkRNA[genelist_top500FC,]
   
-  BiocManager::install("EpiDISH")
-  library(EpiDISH)
+  # # Instlaling EpiDISH for the RCP function
+  # BiocManager::install("EpiDISH")
+  # library(EpiDISH)
   
   if ( !( is.null(x = mix_rna) ) ) {
 
-    prop_rna = t(epidish(beta.m = mix_rna, ref.m = ref_bulkRNA, method = "RPC")$estF)
+    # prop_rna = t(epidish(beta.m = mix_rna, ref.m = ref_bulkRNA, method = "RPC")$estF)
     
-  #   idx_feat = intersect(rownames(mix_rna), rownames(ref_bulkRNA))
-  #   mix_rna = mix_rna[idx_feat,]
+    idx_feat = intersect(rownames(mix_rna), rownames(new_ref_bulkRNA))
+    mix_rna = mix_rna[idx_feat,]
 
-  # # Add a tranformation to mix_rna  
+  # Add a tranformation to mix_rna  
 
-  #   ref_bulkRNA = ref_bulkRNA[idx_feat,]
+    new_ref_bulkRNA = new_ref_bulkRNA[idx_feat,]
     
-  #   prop_rna = apply(mix_rna, 2, function(b, A) {
-  #     tmp_prop = nnls::nnls(b=b, A=A)$x
-  #     tmp_prop = tmp_prop / sum(tmp_prop) # Sum To One
-  #     return(tmp_prop)
-  #   }, A=ref_bulkRNA)  
-  #   rownames(prop_rna) = colnames(ref_bulkRNA)
+    prop_rna = apply(mix_rna, 2, function(b, A) {
+      tmp_prop = nnls::nnls(b=b, A=A)$x
+      tmp_prop = tmp_prop / sum(tmp_prop) # Sum To One
+      return(tmp_prop)
+    }, A=new_ref_bulkRNA)  
+    rownames(prop_rna) = colnames(new_ref_bulkRNA)
 
     # # Test a random solution
     # # Set a seed for reproducibility
@@ -86,25 +119,25 @@ program = function(mix_rna=NULL,
   # ## we compute the estimation of A for the methylation data set :
   if ( !( is.null(mix_met) ) ) {
 
-    prop_met = t(epidish(beta.m = mix_met, ref.m = ref_met, method = "RPC")$estF)
+    # prop_met = t(epidish(beta.m = mix_met, ref.m = ref_met, method = "RPC")$estF)
 
     # colnames(prop_met) = colnames(ref_met)
     # print(colnames(ref_met))
     
-    # idx_feat = intersect(rownames(mix_met), rownames(ref_met))
-    # mix_met = mix_met[idx_feat,]
+    idx_feat = intersect(rownames(mix_met), rownames(ref_met))
+    mix_met = mix_met[idx_feat,]
  
-    # # Linear methods
-    # ref_met = ref_met[idx_feat,]
+    # Linear methods
+    ref_met = ref_met[idx_feat,]
     
-    # prop_met = apply(mix_met, 2, function(b, A) {
-    #   tmp_prop = nnls::nnls(b=b, A=A)$x
-    #   tmp_prop = tmp_prop / sum(tmp_prop) # Sum To One
-    #   return(tmp_prop)
-    # }, A=ref_met)  
-    # rownames(prop_met) = colnames(ref_met)
+    prop_met = apply(mix_met, 2, function(b, A) {
+      tmp_prop = nnls::nnls(b=b, A=A)$x
+      tmp_prop = tmp_prop / sum(tmp_prop) # Sum To One
+      return(tmp_prop)
+    }, A=ref_met)  
+    rownames(prop_met) = colnames(ref_met)
 
-    # return(prop_met)
+    return(prop_met)
 
     }
       
